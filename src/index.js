@@ -1,4 +1,5 @@
 import axios from 'axios';
+import {cachedPpps} from './cachedPpps'
 
 const GEO_API_URL = 'https://freegeoip.app/json/';
 const COUNTRY_META_API = 'https://restcountries.eu/rest/v2/alpha/';
@@ -76,18 +77,32 @@ const getPppConversionFactor = pppInformation => ({
   pppConversionFactor: computePppConversionFactor(pppInformation),
 });
 
-const getPpp = (openexchangeratesApiKey, quandlApiKey) =>
-  getGeo()
-    .then(fetchCountryMeta)
-    .then(fetchExchangedRates(openexchangeratesApiKey))
-    .then(fetchPpp(quandlApiKey))
-    .then(getPppConversionFactor)
-    .catch(() => {
-      try {
-        throw new Error('Failed to fetch purchasing parity power.');
-      } catch (e) {
-        throw e;
-      }
-    });
+const getPppFromStatic = ({countryCodeIsoAlpha2, countryName}) => {
+  return {
+    countryName,
+    pppConversionFactor: cachedPpps[countryCodeIsoAlpha2]
+  }
+}
+
+const getPpp = (openexchangeratesApiKey, quandlApiKey) => {
+  if (!openexchangeratesApiKey || !quandlApiKey) {
+    return getGeo()
+      .then(fetchCountryMeta)
+      .then(getPppFromStatic)
+  } else {
+    return getGeo()
+      .then(fetchCountryMeta)
+      .then(fetchExchangedRates(openexchangeratesApiKey))
+      .then(fetchPpp(quandlApiKey))
+      .then(getPppConversionFactor)
+      .catch(() => {
+        try {
+          throw new Error('Failed to fetch purchasing parity power.');
+        } catch (e) {
+          throw e;
+        }
+      });
+  }
+}
 
 export default getPpp;
